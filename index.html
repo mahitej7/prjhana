@@ -6695,7 +6695,7 @@
     if(phase==='opening'){
       trayOpen = clamp(pT/(reduceMotion?0.8:1.7), 0, 1);
       if(trayOpen>=1){ setPhase('ready'); idleT=0;
-        timers.push(setTimeout(()=>{ if(phase==='ready') showHint('pull the last match free'); }, reduceMotion?200:1200)); }
+        timers.push(setTimeout(()=>{ if(phase==='ready') showHint('swipe right on the matchstick'); }, reduceMotion?200:1200)); }
     }
     if(phase==='ready'){
       idleT+=dt;
