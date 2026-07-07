@@ -6276,9 +6276,9 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   buildBackground(); buildGlobe(); buildVinyl();
   const io=new IntersectionObserver((entries)=>{ entries.forEach(en=>{
     visible=en.isIntersecting && en.intersectionRatio>0.25;
-    if(visible){ lockSongScroll(); if(!started) start(); if(!running){ running=true; lastNow=performance.now(); raf=requestAnimationFrame(loop); } }
+    if(visible){ if(en.intersectionRatio>=0.72) lockSongScroll(); if(!started) start(); if(!running){ running=true; lastNow=performance.now(); raf=requestAnimationFrame(loop); } }
     else{ running=false; if(raf) cancelAnimationFrame(raf); raf=0; if(captureTouch) setCaptureTouch(false); if(armPad) armPad.style.display='none'; ArmSfx.stop(); audioExit(); }
-  }); }, {threshold:[0,0.05,0.25,0.6]});
+  }); }, {threshold:[0,0.05,0.25,0.6,0.72,0.9]});
   io.observe(sceneEl);
 
   let rsz=0; window.addEventListener('resize',()=>{ clearTimeout(rsz); rsz=setTimeout(sizeRenderer,150); }, {passive:true});
@@ -7443,10 +7443,10 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   const ro=('ResizeObserver' in window)? new ResizeObserver(queueResize):null; if(ro) ro.observe(mount);
 
   const io=new IntersectionObserver(es=>{ es.forEach(en=>{
-    if(en.isIntersecting){ lockVoiceScroll(); if(!running){ running=true; last=performance.now(); raf=requestAnimationFrame(frame); } }
+    if(en.isIntersecting){ if(en.intersectionRatio>=0.72) lockVoiceScroll(); if(!running){ running=true; last=performance.now(); raf=requestAnimationFrame(frame); } }
     else { running=false; if(raf) cancelAnimationFrame(raf); raf=0;
       discs.forEach(d=>{ if(d.playing && !d.failed){ try{ d.el.pause(); }catch(e){} } }); }
-  }); },{ threshold:0.12 });
+  }); },{ threshold:[0,0.12,0.6,0.72,0.9] });
   io.observe(section);
 
   function teardown(){ running=false; if(raf) cancelAnimationFrame(raf);
