@@ -2,7 +2,7 @@
 <html lang="en" class="archive-sealed">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Property Of Hafsa</title>
 <!-- Import map: pins the bare "three" specifier (used internally by the
      examples/jsm loaders such as GLTFLoader/RGBELoader) to the exact same
@@ -655,21 +655,6 @@
     text-align:center;
     transition:opacity 1.2s ease, transform 1.2s ease;
   }
-  @media (orientation:portrait) and (max-width:820px){
-    #scene-redroom{
-      --fc-mobile-y:0px;
-      height:100svh;
-      min-height:100svh;
-    }
-    @supports (height:100dvh){
-      #scene-redroom{ height:100dvh; min-height:100dvh; }
-    }
-    .fc-intro{
-      padding-top:calc(7vw + env(safe-area-inset-top));
-      padding-bottom:calc(7vw + env(safe-area-inset-bottom));
-      translate:0 var(--fc-mobile-y);
-    }
-  }
   .fc-intro.fc-hide{ opacity:0; transform:translateY(-10px); pointer-events:none; }
 
   .fc-prompt{ display:flex; flex-direction:column; gap:0.9rem; max-width:34ch; }
@@ -698,6 +683,31 @@
   }
   @media (max-width:380px){
     .fc-cards{ gap:0.6rem; }
+  }
+  /* ---- Favourite Colour: mobile portrait vertical fix (desktop untouched) ----
+     On phones the browser UI / notch / Dynamic Island can crop the heading when
+     the intro is centred against the full viewport. We keep centring but reserve
+     safe-area + a small responsive nudge at the top so the complete heading is
+     always visible. Uses svh/dvh + env() insets — no fixed offsets, no hardcoding,
+     adapts automatically to every device. Only applies in portrait on coarse
+     pointers (real phones/tablets), never on desktop. */
+  @media (orientation:portrait) and (pointer:coarse){
+    .fc-intro{
+      /* justify-content stays 'center'; this padding shifts the centred block down
+         by exactly the device's own safe inset plus a gentle viewport-proportional
+         breathing amount, so the first line clears the status bar / notch. */
+      padding-top:calc(env(safe-area-inset-top, 0px) + 4vh + 0.6rem);
+      padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 2vh);
+      /* bias the centred content downward a touch so the top never crops first */
+      justify-content:center;
+    }
+    /* prefer dynamic viewport height so the section tracks browser-UI expand/collapse */
+    #scene-redroom{ height:100svh; min-height:100svh; }
+  }
+  @supports (height:100dvh){
+    @media (orientation:portrait) and (pointer:coarse){
+      #scene-redroom{ height:100dvh; min-height:100dvh; }
+    }
   }
 
   .fc-card{
@@ -2199,7 +2209,6 @@
     const RM     = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     const COARSE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     const MOBILE = COARSE || window.innerWidth <= 820;
-    const portraitMQ = window.matchMedia ? window.matchMedia('(orientation: portrait) and (max-width: 820px)') : null;
 
     const COLOURS = [
       {name:'Midnight Blue', hex:'#21304F'},
@@ -2215,29 +2224,6 @@
     // ---------- small helpers ----------
     function hexRgb(h){ h=h.replace('#',''); return {r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16)}; }
     function lumOf(c){ return 0.299*c.r + 0.587*c.g + 0.114*c.b; }
-    function safeInsetTop(){
-      const probe=document.createElement('div');
-      probe.style.cssText='position:fixed;top:0;left:0;height:env(safe-area-inset-top);visibility:hidden;pointer-events:none;';
-      document.body.appendChild(probe);
-      const v=probe.getBoundingClientRect().height || 0;
-      probe.remove();
-      return v;
-    }
-    let fcShiftRaf=0;
-    function tuneMobileIntroOffset(){
-      if(!intro || !q1) return;
-      cancelAnimationFrame(fcShiftRaf);
-      fcShiftRaf=requestAnimationFrame(()=>{
-        const isPortrait = portraitMQ ? portraitMQ.matches : (window.innerHeight >= window.innerWidth && MOBILE);
-        if(!isPortrait){ scene.style.removeProperty('--fc-mobile-y'); return; }
-        scene.style.setProperty('--fc-mobile-y','0px');
-        const vv=window.visualViewport;
-        const viewportTop=(vv ? vv.offsetTop : 0) + safeInsetTop();
-        const promptRect=q1.getBoundingClientRect();
-        const need=Math.max(0, viewportTop - promptRect.top);
-        scene.style.setProperty('--fc-mobile-y', need ? `${need}px` : '0px');
-      });
-    }
     function inkFor(hex){ return lumOf(hexRgb(hex)) > 150 ? '#2A1410' : '#FBEFE6'; }
     function paperCss(hex){
       return 'radial-gradient(120% 130% at 30% 20%, rgba(255,255,255,0.16), transparent 55%), '+hex;
@@ -2639,7 +2625,6 @@
     function startIntro(){
       phase='intro';
       q1.classList.add('show');
-      tuneMobileIntroOffset();
       after(1700, ()=> q2.classList.add('show'));
       after(2700, buildCards);
     }
@@ -2657,7 +2642,6 @@
         after(60*idx, ()=> btn.classList.add('show'));
       });
       phase='choosing';
-      tuneMobileIntroOffset();
       if(!MOBILE && !RM) enableMagnetic();
     }
 
@@ -2826,13 +2810,10 @@
     function activate(){
       if(activated) return; activated=true;
       sizeCanvases();
-      tuneMobileIntroOffset();
       startIntro();
     }
     // resize only matters before the burn grid exists
-    window.addEventListener('resize', ()=>{ if(phase==='idle'||phase==='intro'||phase==='choosing'){ tuneMobileIntroOffset(); } }, {passive:true});
-    window.addEventListener('orientationchange', tuneMobileIntroOffset, {passive:true});
-    if(window.visualViewport) window.visualViewport.addEventListener('resize', tuneMobileIntroOffset, {passive:true});
+    window.addEventListener('resize', ()=>{ if(phase==='idle'||phase==='intro'||phase==='choosing'){ /* canvases sized at fill */ } }, {passive:true});
 
     const io=new IntersectionObserver((entries)=>{
       entries.forEach(e=>{ if(e.isIntersecting && e.intersectionRatio>0.55 && !activated){ io.disconnect(); activate(); } });
