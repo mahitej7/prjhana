@@ -1863,51 +1863,6 @@
 </section>
 
 <script>
-window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
-  const keys = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Home','End',' ','Spacebar']);
-  let owner = null, lockedY = 0, releaseTimer = 0, raf = 0;
-  const root = document.documentElement;
-  function active(){ return !!owner; }
-  function hold(){
-    if(!active() || raf) return;
-    raf = requestAnimationFrame(()=>{
-      raf = 0;
-      if(active() && Math.abs(window.scrollY - lockedY) > 1) window.scrollTo(0, lockedY);
-    });
-  }
-  function lock(id){
-    if(owner === id) return;
-    clearTimeout(releaseTimer);
-    owner = id;
-    lockedY = window.scrollY || window.pageYOffset || 0;
-    root.style.overscrollBehavior = 'none';
-    if(document.body) document.body.style.overscrollBehavior = 'none';
-    hold();
-  }
-  function unlock(id, delay){
-    if(owner !== id) return;
-    clearTimeout(releaseTimer);
-    releaseTimer = setTimeout(()=>{
-      if(owner !== id) return;
-      owner = null;
-      root.style.overscrollBehavior = '';
-      if(document.body) document.body.style.overscrollBehavior = '';
-    }, delay == null ? 420 : delay);
-  }
-  function forceUnlock(id){
-    if(owner !== id) return;
-    clearTimeout(releaseTimer);
-    owner = null;
-    root.style.overscrollBehavior = '';
-    if(document.body) document.body.style.overscrollBehavior = '';
-  }
-  window.addEventListener('scroll', hold, {passive:true});
-  window.addEventListener('wheel', e=>{ if(active()) e.preventDefault(); }, {passive:false});
-  window.addEventListener('touchmove', e=>{ if(active()) e.preventDefault(); }, {passive:false});
-  window.addEventListener('keydown', e=>{ if(active() && keys.has(e.key)) e.preventDefault(); }, {passive:false});
-  return { lock, unlock, forceUnlock, get owner(){ return owner; } };
-})();
-
 (function(){
 
   // ---------- UTILITIES ----------
@@ -1977,55 +1932,6 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   window.addEventListener('touchmove', (e)=>{
     if(isSealed()) e.preventDefault();
   }, {passive:false});
-
-  // ---------- PROJECT SOUL: section-scoped experience scroll lock ----------
-  // Used by the Favourite Song and Voice Memories sections only. It blocks
-  // page-scroll inputs while leaving pointer/tap/click interaction inside the
-  // active scene intact.
-  window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
-    const keys = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','PageUp','PageDown','Home','End',' ','Spacebar']);
-    let owner = null, lockedY = 0, releaseTimer = 0, raf = 0;
-    const root = document.documentElement;
-    function active(){ return !!owner; }
-    function hold(){
-      if(!active() || raf) return;
-      raf = requestAnimationFrame(()=>{
-        raf = 0;
-        if(active() && Math.abs(window.scrollY - lockedY) > 1) window.scrollTo(0, lockedY);
-      });
-    }
-    function lock(id){
-      if(owner === id) return;
-      clearTimeout(releaseTimer);
-      owner = id;
-      lockedY = window.scrollY || window.pageYOffset || 0;
-      root.style.overscrollBehavior = 'none';
-      document.body.style.overscrollBehavior = 'none';
-      hold();
-    }
-    function unlock(id, delay){
-      if(owner !== id) return;
-      clearTimeout(releaseTimer);
-      releaseTimer = setTimeout(()=>{
-        if(owner !== id) return;
-        owner = null;
-        root.style.overscrollBehavior = '';
-        document.body.style.overscrollBehavior = '';
-      }, delay == null ? 420 : delay);
-    }
-    function forceUnlock(id){
-      if(owner !== id) return;
-      clearTimeout(releaseTimer);
-      owner = null;
-      root.style.overscrollBehavior = '';
-      document.body.style.overscrollBehavior = '';
-    }
-    window.addEventListener('scroll', hold, {passive:true});
-    window.addEventListener('wheel', e=>{ if(active()) e.preventDefault(); }, {passive:false});
-    window.addEventListener('touchmove', e=>{ if(active()) e.preventDefault(); }, {passive:false});
-    window.addEventListener('keydown', e=>{ if(active() && keys.has(e.key)) e.preventDefault(); }, {passive:false});
-    return { lock, unlock, forceUnlock, get owner(){ return owner; } };
-  })();
 
   // Generic scroll-handler throttle: ensures the wrapped function runs at
   // most once per animation frame, regardless of how many scroll events fire.
@@ -2903,6 +2809,16 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
       fxCv.style.opacity='0';
       stopLoop();
       contCue.classList.add('show');
+      // a gentle, one-time hand-off to the next scene (only if still in view)
+      after(2600, ()=>{
+        const r=scene.getBoundingClientRect();
+        const vh=window.innerHeight||1;
+        const visible = Math.min(r.bottom,vh)-Math.max(r.top,0);
+        if(visible > vh*0.6){
+          const next=document.getElementById('scene-song');
+          if(next && next.scrollIntoView){ try{ next.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ } }
+        }
+      });
     }
 
     // ---------- activation ----------
@@ -5363,21 +5279,6 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   const cardEl  = document.getElementById('sg-audio-card');
   const audioEl = document.getElementById('sg-audio');
   if(!sceneEl || !mount) return;
-  const SONG_LOCK_ID = 'project-soul-song';
-  let songScrollUnlocked = false;
-  function lockSongScroll(){
-    if(!songScrollUnlocked && window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.lock(SONG_LOCK_ID);
-  }
-  function songIsSettledInView(entry){
-    const viewportTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
-    return entry.intersectionRatio >= 0.6 && Math.abs(entry.boundingClientRect.top - viewportTop) < 28;
-  }
-  function unlockSongScroll(){
-    if(songScrollUnlocked) return;
-    songScrollUnlocked = true;
-    finish();
-    if(window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.unlock(SONG_LOCK_ID, 420);
-  }
 
   // ---- load Three.js: local import-map first, CDN only as a fallback ----
   let THREE=null;
@@ -5966,6 +5867,7 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
         armAngle=lerp(armAngle, armAngleRest + Math.sin(T*0.8)*0.006, dt*3);
         vinylIdleT+=dt;
         if(needleHint && !hasDragged && vinylIdleT>0.6 && !needleHint.classList.contains('show')) needleHint.classList.add('show');
+        if(vinylIdleT>(reduced?6:26)) autoArm=true;           // nobody gets stranded — the arm lowers itself
       }
       if(autoArm && !contactDone){ armAngle=lerp(armAngle, armAngleGroove, dt*0.7);
         if(armAngle<=armAngleGroove+0.02) landStylus(); }
@@ -6029,11 +5931,6 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
       fadeAudioTo(1,2,false); },400)); }                      // brief crackle, then the song fades in over ~2s
   function audioExit(){ clearInterval(audioFade);
     if(audioEl && audioStarted && !audioEl.paused) fadeAudioTo(0,1.5,true); }    // scroll away → fade out + pause; never auto-resumes
-  if(audioEl){
-    audioEl.addEventListener('ended', ()=>{
-      if(contactDone && phase==='vinylPlay') unlockSongScroll();
-    });
-  }
 
 
   // ====================================================================
@@ -6270,16 +6167,15 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   buildBackground(); buildGlobe(); buildVinyl();
   const io=new IntersectionObserver((entries)=>{ entries.forEach(en=>{
     visible=en.isIntersecting && en.intersectionRatio>0.25;
-    if(visible){ if(songIsSettledInView(en)) lockSongScroll(); if(!started) start(); if(!running){ running=true; lastNow=performance.now(); raf=requestAnimationFrame(loop); } }
+    if(visible){ if(!started) start(); if(!running){ running=true; lastNow=performance.now(); raf=requestAnimationFrame(loop); } }
     else{ running=false; if(raf) cancelAnimationFrame(raf); raf=0; if(captureTouch) setCaptureTouch(false); if(armPad) armPad.style.display='none'; ArmSfx.stop(); audioExit(); }
-  }); }, {threshold:[0,0.05,0.25,0.6,0.9]});
+  }); }, {threshold:[0,0.05,0.25,0.6]});
   io.observe(sceneEl);
 
   let rsz=0; window.addEventListener('resize',()=>{ clearTimeout(rsz); rsz=setTimeout(sizeRenderer,150); }, {passive:true});
   function teardown(){ running=false; if(raf) cancelAnimationFrame(raf); try{ io.disconnect(); }catch(e){} try{ ArmSfx.dispose(); }catch(e){}
     timers.forEach(t=>clearTimeout(t)); clearInterval(audioFade);
     try{ if(audioEl){ audioEl.pause(); } }catch(e){}
-    if(window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.forceUnlock(SONG_LOCK_ID);
     try{ if(renderer.forceContextLoss) renderer.forceContextLoss(); }catch(e){}
     disposables.forEach(x=>{ try{ x&&x.dispose&&x.dispose(); }catch(e){} });
     try{ renderer.dispose&&renderer.dispose(); }catch(e){} }
@@ -7026,20 +6922,6 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   const stage   = document.getElementById('vm-stage');
   const cueEl   = document.getElementById('vm-cue');
   if(!section || !mount || !stage) return;
-  const VOICE_LOCK_ID = 'project-soul-voice';
-  let voiceScrollUnlocked = false;
-  function lockVoiceScroll(){
-    if(!voiceScrollUnlocked && window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.lock(VOICE_LOCK_ID);
-  }
-  function voiceIsSettledInView(entry){
-    const viewportTop = window.visualViewport ? window.visualViewport.offsetTop : 0;
-    return entry.intersectionRatio >= 0.6 && Math.abs(entry.boundingClientRect.top - viewportTop) < 28;
-  }
-  function unlockVoiceScroll(){
-    if(voiceScrollUnlocked) return;
-    voiceScrollUnlocked = true;
-    if(window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.unlock(VOICE_LOCK_ID, 420);
-  }
 
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 720;
@@ -7339,6 +7221,7 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
     if(phase==='intro'){ if(pT>0.4) setPhase('ready'); }
     if(phase==='ready'){ idleT+=dt;
       if(cueEl && !cueEl.classList.contains('show') && idleT>(reduceMotion?2:9)) cueEl.classList.add('show');
+      if(idleT>(reduceMotion?4:28)){ const nx=discs.findIndex(d=>!d.done&&!d.playing); if(nx>=0) pressDisc(nx); }
     }
 
     calmK = damp(calmK, (phase==='press'||phase==='playing')?1:0, 0.1, dt);
@@ -7408,7 +7291,7 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
     }
     if(phase==='afterText'){
       if(pT>2.0 && !endLine[0].classList.contains('show')) showLines(endLine);           // ~2s pause, then the closing lines
-      if(pT>5 && cueEl && !cueEl.classList.contains('show')){ cueEl.classList.add('show'); unlockVoiceScroll(); }
+      if(pT>5 && cueEl && !cueEl.classList.contains('show')) cueEl.classList.add('show');
     }
 
     // dust
@@ -7441,17 +7324,16 @@ window.ProjectSoulScrollLock = window.ProjectSoulScrollLock || (()=>{
   const ro=('ResizeObserver' in window)? new ResizeObserver(queueResize):null; if(ro) ro.observe(mount);
 
   const io=new IntersectionObserver(es=>{ es.forEach(en=>{
-    if(en.isIntersecting){ if(voiceIsSettledInView(en)) lockVoiceScroll(); if(!running){ running=true; last=performance.now(); raf=requestAnimationFrame(frame); } }
+    if(en.isIntersecting){ if(!running){ running=true; last=performance.now(); raf=requestAnimationFrame(frame); } }
     else { running=false; if(raf) cancelAnimationFrame(raf); raf=0;
       discs.forEach(d=>{ if(d.playing && !d.failed){ try{ d.el.pause(); }catch(e){} } }); }
-  }); },{ threshold:[0,0.12,0.6,0.9] });
+  }); },{ threshold:0.12 });
   io.observe(section);
 
   function teardown(){ running=false; if(raf) cancelAnimationFrame(raf);
     try{ io.disconnect(); }catch(e){} try{ ro&&ro.disconnect(); }catch(e){}
     timers.forEach(t=>clearTimeout(t));
     discs.forEach(d=>{ try{ d.el.pause(); }catch(e){} try{ d.ac&&d.ac.close(); }catch(e){} });
-    if(window.ProjectSoulScrollLock) window.ProjectSoulScrollLock.forceUnlock(VOICE_LOCK_ID);
     disposables.forEach(x=>{ try{ x.dispose&&x.dispose(); }catch(e){} });
     try{ composer&&composer.dispose&&composer.dispose(); }catch(e){}
     try{ renderer.dispose(); }catch(e){} }
